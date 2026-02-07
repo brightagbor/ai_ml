@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bias Parameter Effect on Sigmoid Function</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .title {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 25px;
+            border-radius: 50px;
+            backdrop-filter: blur(5px);
+        }
+        .control-group label {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .slider {
+            width: 200px;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .value-display {
+            min-width: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        .explanation {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+        .explanation h3 {
+            color: #4ecdc4;
+            margin-top: 0;
+            font-size: 1.4em;
+        }
+        .key-points {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .point {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #4ecdc4;
+        }
+        .formula {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            text-align: center;
+            margin: 15px 0;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        .color-legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Neural Network Bias Parameter Visualization</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="biasSlider">Bias (b):</label>
+                <input type="range" id="biasSlider" class="slider" min="-5" max="5" step="0.1" value="0">
+                <span class="value-display" id="biasValue">0.0</span>
+            </div>
+            <div class="control-group">
+                <label for="weightSlider">Weight (w):</label>
+                <input type="range" id="weightSlider" class="slider" min="0.1" max="3" step="0.1" value="1">
+                <span class="value-display" id="weightValue">1.0</span>
+            </div>
+        </div>
+
+        <div class="formula">
+            σ(x) = 1 / (1 + e^(-(wx + b)))
+        </div>
+
+        <div class="chart-container">
+            <canvas id="sigmoidChart"></canvas>
+        </div>
+
+        <div class="color-legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ff6b6b;"></div>
+                <span>Negative Bias (shifts right)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4ecdc4;"></div>
+                <span>Zero Bias (centered)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #45b7d1;"></div>
+                <span>Positive Bias (shifts left)</span>
+            </div>
+        </div>
+
+        <div class="explanation">
+            <h3>Understanding Bias in Neural Networks</h3>
+            <p>The bias parameter (b) in a neural network acts as a horizontal shift for the activation function. It controls the threshold at which the neuron activates.</p>
+            
+            <div class="key-points">
+                <div class="point">
+                    <h4>🔵 Positive Bias (b > 0)</h4>
+                    <p>Shifts the curve LEFT, making the neuron activate more easily. The neuron reaches 50% activation at x = -b/w instead of x = 0.</p>
+                </div>
+                <div class="point">
+                    <h4>🔴 Negative Bias (b < 0)</h4>
+                    <p>Shifts the curve RIGHT, making the neuron activate later. The neuron needs larger positive inputs to reach the same activation level.</p>
+                </div>
+                <div class="point">
+                    <h4>⚪ Zero Bias (b = 0)</h4>
+                    <p>The curve is centered at x = 0. The neuron outputs 0.5 when the weighted input sum equals zero.</p>
+                </div>
+                <div class="point">
+                    <h4>⚙️ Weight Effect</h4>
+                    <p>The weight (w) controls the steepness of the curve. Higher weights make the transition sharper, while lower weights make it more gradual.</p>
+                </div>
+            </div>
+
+            <p style="margin-top: 20px; font-style: italic; text-align: center;">
+                💡 Try adjusting the sliders above to see how bias and weight parameters affect the sigmoid activation function!
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('sigmoidChart').getContext('2d');
+        let chart;
+
+        function sigmoid(x, weight, bias) {
+            return 1 / (1 + Math.exp(-(weight * x + bias)));
+        }
+
+        function generateData(weight, bias) {
+            const data = [];
+            for (let x = -10; x <= 10; x += 0.1) {
+                data.push({
+                    x: x,
+                    y: sigmoid(x, weight, bias)
+                });
+            }
+            return data;
+        }
+
+        function getColor(bias) {
+            if (bias > 0.1) return '#45b7d1'; // Blue for positive
+            if (bias < -0.1) return '#ff6b6b'; // Red for negative
+            return '#4ecdc4'; // Teal for zero/neutral
+        }
+
+        function updateChart() {
+            const bias = parseFloat(document.getElementById('biasSlider').value);
+            const weight = parseFloat(document.getElementById('weightSlider').value);
+            
+            document.getElementById('biasValue').textContent = bias.toFixed(1);
+            document.getElementById('weightValue').textContent = weight.toFixed(1);
+
+            const data = generateData(weight, bias);
+            const referenceData = generateData(1, 0); // Reference curve (w=1, b=0)
+            
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Reference (w=1, b=0)',
+                            data: referenceData,
+                            borderColor: 'rgba(200, 200, 200, 0.5)',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            tension: 0.4
+                        },
+                        {
+                            label: `Current (w=${weight.toFixed(1)}, b=${bias.toFixed(1)})`,
+                            data: data,
+                            borderColor: getColor(bias),
+                            backgroundColor: getColor(bias) + '20',
+                            borderWidth: 4,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            min: -10,
+                            max: 10,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Input (x)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        y: {
+                            min: 0,
+                            max: 1,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Output σ(x)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
+                    elements: {
+                        line: {
+                            tension: 0.4
+                        }
+                    }
+                }
+            });
+
+            // Add vertical line at decision boundary (where output = 0.5)
+            const decisionBoundary = -bias / weight;
+            if (decisionBoundary >= -10 && decisionBoundary <= 10) {
+                chart.options.plugins.annotation = {
+                    annotations: {
+                        line1: {
+                            type: 'line',
+                            xMin: decisionBoundary,
+                            xMax: decisionBoundary,
+                            borderColor: 'rgba(255, 165, 0, 0.8)',
+                            borderWidth: 2,
+                            borderDash: [3, 3],
+                            label: {
+                                content: `Decision boundary: x = ${decisionBoundary.toFixed(2)}`,
+                                enabled: true,
+                                position: 'top'
+                            }
+                        }
+                    }
+                };
+                chart.update();
+            }
+        }
+
+        document.getElementById('biasSlider').addEventListener('input', updateChart);
+        document.getElementById('weightSlider').addEventListener('input', updateChart);
+
+        // Initialize chart
+        updateChart();
+    </script>
+</body>
+</html>
