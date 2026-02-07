@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Error Surface Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f0f8ff, #e6f3ff);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            color: #333;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(0, 150, 255, 0.2);
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            color: #333;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(0, 150, 255, 0.2);
+            max-width: 300px;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            margin: 3px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            text-align: center;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+            background: linear-gradient(45deg, #45a049, #3d8b40);
+        }
+        
+        label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+        }
+        
+        input[type="range"] {
+            width: 200px;
+            margin: 5px 0;
+        }
+        
+        .point-info {
+            font-size: 13px;
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(240, 248, 255, 0.8);
+            border-radius: 8px;
+            border-left: 4px solid #0066ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="controls">
+            <h3>🎛️ Controls</h3>
+            <button onclick="toggleAnimation()">⏯️ Toggle Animation</button>
+            <button onclick="resetView()">🔄 Reset View</button>
+            <button onclick="showGradient()">📐 Show Gradients</button>
+            <button onclick="startGradientDescent()">🎯 Start Gradient Descent</button>
+            <button onclick="simulateBackprop()">🔄 Simulate Backpropagation</button>
+            <button onclick="resetOptimization()">🔄 Reset Path</button>
+            
+            <label>Surface Complexity:</label>
+            <input type="range" min="0.5" max="3" step="0.1" value="1.5" onchange="updateSurface(this.value)">
+            
+            <label>Learning Rate:</label>
+            <input type="range" min="0.01" max="0.5" step="0.01" value="0.1" onchange="setLearningRate(this.value)">
+            
+            <label>Animation Speed:</label>
+            <input type="range" min="0.1" max="2" step="0.1" value="1" onchange="setAnimationSpeed(this.value)">
+        </div>
+        
+        <div id="info">
+            <h3>📊 Neural Network Learning</h3>
+            <div class="point-info">
+                <strong>🔵 Global Minimum:</strong><br>
+                Optimal weights - best solution
+            </div>
+            <div class="point-info">
+                <strong>🔴 Local Minimum:</strong><br>
+                Sub-optimal - where training might get stuck
+            </div>
+            <div class="point-info">
+                <strong>🟢 Current Weights:</strong><br>
+                Training position with gradient ∇E(w)
+            </div>
+            <div class="point-info">
+                <strong>🟡 Gradient Descent Path:</strong><br>
+                Shows how weights update during training
+            </div>
+            <div class="point-info">
+                <strong>⚡ Backpropagation:</strong><br>
+                Error flowing backwards through network layers
+            </div>
+            <p><strong>💡 Learning:</strong> Watch how gradient descent follows the steepest path downhill to minimize error!</p>
+            
+            <div id="stats" style="margin-top: 10px; font-size: 12px; background: rgba(240, 248, 255, 0.8); padding: 8px; border-radius: 5px;">
+                <div>Iteration: <span id="iteration">0</span></div>
+                <div>Error: <span id="currentError">0.00</span></div>
+                <div>Learning Rate: <span id="learningRateDisplay">0.1</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, errorSurface;
+        let globalMin, localMin, currentPoint;
+        let gradientArrows = [];
+        let animationId;
+        let isAnimating = true;
+        let animationSpeed = 1;
+        let surfaceComplexity = 1.5;
+        let showGradients = false;
+        
+        // Gradient Descent Variables
+        let isGradientDescent = false;
+        let gradientDescentPath = [];
+        let gradientDescentLine;
+        let learningRate = 0.1;
+        let currentIteration = 0;
+        let descentPosition = { x: 8, z: 6 }; // Starting position
+        
+        // Backpropagation Variables
+        let isBackpropagating = false;
+        let backpropLayers = [];
+        let backpropConnections = [];
+        
+        // Initialize the scene
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf5f5f5);
+            
+            // Add a subtle gradient background
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 512;
+            const gradient = context.createLinearGradient(0, 0, 0, 512);
+            gradient.addColorStop(0, '#e3f2fd');
+            gradient.addColorStop(1, '#bbdefb');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 512, 512);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            scene.background = texture;
+            
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 15, 15);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            // Add additional fill light
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            fillLight.position.set(-10, 10, -10);
+            scene.add(fillLight);
+            
+            // Create error surface
+            createErrorSurface();
+            
+            // Create special points
+            createSpecialPoints();
+            
+            // Create gradient descent path visualization
+            createGradientDescentPath();
+            
+            // Create backpropagation network
+            createBackpropNetwork();
+            
+            // Mouse controls
+            setupMouseControls();
+            
+            // Start animation
+            animate();
+        }
+        
+        // Create the error surface using a parametric function
+        function createErrorSurface() {
+            const geometry = new THREE.ParametricGeometry((u, v, target) => {
+                const x = (u - 0.5) * 20; // w1 axis
+                const z = (v - 0.5) * 20; // w2 axis
+                
+                // Create a complex error surface with multiple minima
+                let y = 2 + 
+                    Math.sin(x * 0.3 * surfaceComplexity) * Math.cos(z * 0.3 * surfaceComplexity) * 3 +
+                    Math.exp(-((x - 5) ** 2 + (z - 3) ** 2) / 20) * 8 + // Local minimum
+                    Math.exp(-((x + 3) ** 2 + (z + 5) ** 2) / 15) * 12 + // Another local min
+                    (x ** 2 + z ** 2) * 0.02 + // Global trend
+                    Math.sin(x * 0.1) * Math.sin(z * 0.1) * 2;
+                
+                // Make global minimum more pronounced
+                y -= Math.exp(-((x - 2) ** 2 + (z - 1) ** 2) / 8) * 15;
+                
+                target.set(x, y, z);
+            }, 80, 80);
+            
+            // Create gradient-based coloring
+            const colors = [];
+            const positions = geometry.attributes.position.array;
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                const y = positions[i + 1];
+                const normalizedHeight = Math.max(0, Math.min(1, (y + 5) / 20));
+                
+                // Color from blue (low) to red (high)
+                const r = normalizedHeight;
+                const g = 1 - Math.abs(normalizedHeight - 0.5) * 2;
+                const b = 1 - normalizedHeight;
+                
+                colors.push(r, g, b);
+            }
+            
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            
+            const material = new THREE.MeshPhongMaterial({ 
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide,
+                shininess: 30
+            });
+            
+            if (errorSurface) {
+                scene.remove(errorSurface);
+            }
+            
+            errorSurface = new THREE.Mesh(geometry, material);
+            errorSurface.receiveShadow = true;
+            scene.add(errorSurface);
+        }
+        
+        // Create special points (minima and current point)
+        function createSpecialPoints() {
+            // Global minimum (wB)
+            const globalMinGeom = new THREE.SphereGeometry(0.5, 16, 16);
+            const globalMinMat = new THREE.MeshPhongMaterial({ 
+                color: 0x1976d2,
+                emissive: 0x0d47a1,
+                shininess: 100
+            });
+            globalMin = new THREE.Mesh(globalMinGeom, globalMinMat);
+            globalMin.position.set(2, getErrorValue(2, 1), 1);
+            globalMin.castShadow = true;
+            scene.add(globalMin);
+            
+            // Local minimum (wA)
+            const localMinGeom = new THREE.SphereGeometry(0.5, 16, 16);
+            const localMinMat = new THREE.MeshPhongMaterial({ 
+                color: 0xf44336,
+                emissive: 0xd32f2f,
+                shininess: 100
+            });
+            localMin = new THREE.Mesh(localMinGeom, localMinMat);
+            localMin.position.set(5, getErrorValue(5, 3), 3);
+            localMin.castShadow = true;
+            scene.add(localMin);
+            
+            // Current point (wC)
+            const currentGeom = new THREE.SphereGeometry(0.4, 16, 16);
+            const currentMat = new THREE.MeshPhongMaterial({ 
+                color: 0x4caf50,
+                emissive: 0x2e7d32,
+                shininess: 100
+            });
+            currentPoint = new THREE.Mesh(currentGeom, currentMat);
+            currentPoint.castShadow = true;
+            scene.add(currentPoint);
+        }
+        
+        // Calculate error value at given coordinates
+        function getErrorValue(x, z) {
+            let y = 2 + 
+                Math.sin(x * 0.3 * surfaceComplexity) * Math.cos(z * 0.3 * surfaceComplexity) * 3 +
+                Math.exp(-((x - 5) ** 2 + (z - 3) ** 2) / 20) * 8 +
+                Math.exp(-((x + 3) ** 2 + (z + 5) ** 2) / 15) * 12 +
+                (x ** 2 + z ** 2) * 0.02 +
+                Math.sin(x * 0.1) * Math.sin(z * 0.1) * 2;
+            
+            y -= Math.exp(-((x - 2) ** 2 + (z - 1) ** 2) / 8) * 15;
+            return y;
+        }
+        
+        // Calculate gradient at given point
+        function getGradient(x, z) {
+            const delta = 0.1;
+            const dx = (getErrorValue(x + delta, z) - getErrorValue(x - delta, z)) / (2 * delta);
+            const dz = (getErrorValue(x, z + delta) - getErrorValue(x, z - delta)) / (2 * delta);
+            return { x: dx, z: dz };
+        }
+        
+        // Create coordinate axes
+        function createAxes() {
+            const axesHelper = new THREE.AxesHelper(10);
+            scene.add(axesHelper);
+            
+            // Add labels
+            const loader = new THREE.FontLoader();
+            // Simplified - just use basic geometry for labels
+            const labelGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            const labelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        }
+        
+        // Setup mouse controls
+        function setupMouseControls() {
+            let isMouseDown = false;
+            let mouseX = 0;
+            let mouseY = 0;
+            let phi = 0; // Vertical rotation
+            let theta = 0; // Horizontal rotation
+            const radius = 25; // Distance from center
+            
+            // Mouse down
+            renderer.domElement.addEventListener('mousedown', (event) => {
+                isMouseDown = true;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+                renderer.domElement.style.cursor = 'grabbing';
+            });
+            
+            // Mouse up
+            document.addEventListener('mouseup', () => {
+                isMouseDown = false;
+                renderer.domElement.style.cursor = 'grab';
+            });
+            
+            // Mouse move
+            document.addEventListener('mousemove', (event) => {
+                if (!isMouseDown) return;
+                
+                const deltaX = event.clientX - mouseX;
+                const deltaY = event.clientY - mouseY;
+                
+                // Update rotation angles
+                theta -= deltaX * 0.01;
+                phi += deltaY * 0.01;
+                
+                // Limit vertical rotation
+                phi = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, phi));
+                
+                // Update camera position
+                camera.position.x = radius * Math.sin(theta) * Math.cos(phi);
+                camera.position.y = radius * Math.sin(phi);
+                camera.position.z = radius * Math.cos(theta) * Math.cos(phi);
+                
+                camera.lookAt(0, 0, 0);
+                
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            });
+            
+            // Mouse wheel for zooming
+            renderer.domElement.addEventListener('wheel', (event) => {
+                event.preventDefault();
+                const scale = event.deltaY > 0 ? 1.1 : 0.9;
+                camera.position.multiplyScalar(scale);
+                camera.lookAt(0, 0, 0);
+            });
+            
+            // Set initial cursor style
+            renderer.domElement.style.cursor = 'grab';
+        }
+        
+        // Animation loop
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            
+            if (isAnimating && !isGradientDescent) {
+                const time = Date.now() * 0.001 * animationSpeed;
+                
+                // Move current point along surface
+                const x = Math.sin(time * 0.5) * 6;
+                const z = Math.cos(time * 0.3) * 5;
+                const y = getErrorValue(x, z);
+                
+                currentPoint.position.set(x, y + 0.5, z);
+                
+                // Update gradient arrows if visible
+                if (showGradients) {
+                    updateGradientArrows();
+                }
+            }
+            
+            // Gradient descent animation
+            if (isGradientDescent) {
+                performGradientDescentStep();
+            }
+            
+            // Backpropagation animation
+            if (isBackpropagating) {
+                animateBackpropagation();
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Control functions
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+        }
+        
+        function resetView() {
+            camera.position.set(15, 15, 15);
+            camera.lookAt(0, 0, 0);
+        }
+        
+        function showGradient() {
+            showGradients = !showGradients;
+            if (showGradients) {
+                createGradientArrows();
+            } else {
+                clearGradientArrows();
+            }
+        }
+        
+        function updateSurface(complexity) {
+            surfaceComplexity = parseFloat(complexity);
+            createErrorSurface();
+            
+            // Update point positions
+            globalMin.position.set(2, getErrorValue(2, 1), 1);
+            localMin.position.set(5, getErrorValue(5, 3), 3);
+        }
+        
+        function setAnimationSpeed(speed) {
+            animationSpeed = parseFloat(speed);
+        }
+        
+        // Gradient Descent Functions
+        function startGradientDescent() {
+            isGradientDescent = true;
+            isAnimating = false;
+            currentIteration = 0;
+            descentPosition = { x: 8, z: 6 }; // Reset to starting position
+            gradientDescentPath = [{ ...descentPosition }];
+            updateGradientDescentVisualization();
+            updateStats();
+        }
+        
+        function performGradientDescentStep() {
+            if (currentIteration % (Math.floor(60 / animationSpeed)) === 0) { // Control step speed
+                const gradient = getGradient(descentPosition.x, descentPosition.z);
+                
+                // Update position using gradient descent
+                descentPosition.x -= learningRate * gradient.x;
+                descentPosition.z -= learningRate * gradient.z;
+                
+                // Add to path
+                gradientDescentPath.push({ ...descentPosition });
+                
+                // Update visualization
+                updateGradientDescentVisualization();
+                
+                currentIteration++;
+                updateStats();
+                
+                // Stop if converged or max iterations
+                if (currentIteration > 1000 || 
+                    (Math.abs(gradient.x) < 0.01 && Math.abs(gradient.z) < 0.01)) {
+                    isGradientDescent = false;
+                }
+            }
+        }
+        
+        function updateGradientDescentVisualization() {
+            // Remove existing path
+            if (gradientDescentLine) {
+                scene.remove(gradientDescentLine);
+            }
+            
+            // Create path line
+            const pathGeometry = new THREE.BufferGeometry();
+            const pathPoints = gradientDescentPath.map(point => 
+                new THREE.Vector3(point.x, getErrorValue(point.x, point.z) + 0.2, point.z)
+            );
+            pathGeometry.setFromPoints(pathPoints);
+            
+            const pathMaterial = new THREE.LineBasicMaterial({ 
+                color: 0xffa500, 
+                linewidth: 5 
+            });
+            gradientDescentLine = new THREE.Line(pathGeometry, pathMaterial);
+            scene.add(gradientDescentLine);
+            
+            // Update current point position
+            const currentPos = descentPosition;
+            const y = getErrorValue(currentPos.x, currentPos.z);
+            currentPoint.position.set(currentPos.x, y + 0.5, currentPos.z);
+        }
+        
+        function createGradientDescentPath() {
+            // Initialize empty - will be created during descent
+        }
+        
+        function resetOptimization() {
+            isGradientDescent = false;
+            isBackpropagating = false;
+            isAnimating = true;
+            currentIteration = 0;
+            gradientDescentPath = [];
+            
+            if (gradientDescentLine) {
+                scene.remove(gradientDescentLine);
+                gradientDescentLine = null;
+            }
+            
+            updateStats();
+        }
+        
+        function setLearningRate(rate) {
+            learningRate = parseFloat(rate);
+            document.getElementById('learningRateDisplay').textContent = rate;
+        }
+        
+        function updateStats() {
+            document.getElementById('iteration').textContent = currentIteration;
+            const error = getErrorValue(descentPosition.x, descentPosition.z);
+            document.getElementById('currentError').textContent = error.toFixed(3);
+        }
+        
+        // Backpropagation Functions
+        function createBackpropNetwork() {
+            // Create simple neural network visualization on the side
+            const networkGroup = new THREE.Group();
+            
+            // Input layer
+            for (let i = 0; i < 3; i++) {
+                const neuron = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.3, 16, 16),
+                    new THREE.MeshPhongMaterial({ color: 0x42a5f5 })
+                );
+                neuron.position.set(-15, (i - 1) * 2, 0);
+                networkGroup.add(neuron);
+                backpropLayers.push(neuron);
+            }
+            
+            // Hidden layer
+            for (let i = 0; i < 4; i++) {
+                const neuron = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.3, 16, 16),
+                    new THREE.MeshPhongMaterial({ color: 0x66bb6a })
+                );
+                neuron.position.set(-10, (i - 1.5) * 1.5, 0);
+                networkGroup.add(neuron);
+                backpropLayers.push(neuron);
+            }
+            
+            // Output layer
+            const outputNeuron = new THREE.Mesh(
+                new THREE.SphereGeometry(0.3, 16, 16),
+                new THREE.MeshPhongMaterial({ color: 0xff7043 })
+            );
+            outputNeuron.position.set(-5, 0, 0);
+            networkGroup.add(outputNeuron);
+            backpropLayers.push(outputNeuron);
+            
+            scene.add(networkGroup);
+        }
+        
+        function simulateBackprop() {
+            isBackpropagating = true;
+            setTimeout(() => { isBackpropagating = false; }, 3000);
+        }
+        
+        function animateBackpropagation() {
+            const time = Date.now() * 0.005;
+            backpropLayers.forEach((neuron, index) => {
+                const intensity = Math.sin(time - index * 0.5) * 0.5 + 0.5;
+                neuron.material.emissive.setRGB(intensity * 0.3, intensity * 0.1, intensity * 0.1);
+            });
+        }
+        
+        function createGradientArrows() {
+            clearGradientArrows();
+            
+            // Create grid of gradient arrows
+            for (let x = -8; x <= 8; x += 2) {
+                for (let z = -8; z <= 8; z += 2) {
+                    const gradient = getGradient(x, z);
+                    const y = getErrorValue(x, z);
+                    
+                    // Create arrow geometry
+                    const direction = new THREE.Vector3(-gradient.x, 0, -gradient.z).normalize();
+                    const origin = new THREE.Vector3(x, y + 1, z);
+                    const length = Math.min(2, Math.sqrt(gradient.x ** 2 + gradient.z ** 2));
+                    
+                    const arrowHelper = new THREE.ArrowHelper(
+                        direction, origin, length, 0xffff00, length * 0.2, length * 0.1
+                    );
+                    
+                    gradientArrows.push(arrowHelper);
+                    scene.add(arrowHelper);
+                }
+            }
+        }
+        
+        function updateGradientArrows() {
+            // Update gradient arrows in real-time if needed
+            // For now, they're static
+        }
+        
+        function clearGradientArrows() {
+            gradientArrows.forEach(arrow => scene.remove(arrow));
+            gradientArrows = [];
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Initialize everything
+        init();
+    </script>
+</body>
+</html>

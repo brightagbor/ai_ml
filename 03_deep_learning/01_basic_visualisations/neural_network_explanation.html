@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Explanation - 2 Hidden Layers</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .title {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .network-container {
+            display: flex;
+            justify-content: center;
+            margin: 40px 0;
+            overflow-x: auto;
+            padding: 20px;
+        }
+        .network-svg {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .input-controls, .layer-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+        }
+        .input-group {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .input-group label {
+            min-width: 80px;
+            font-weight: bold;
+        }
+        .input-slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+        }
+        .input-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .input-value {
+            min-width: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .layer-info h3 {
+            color: #4ecdc4;
+            margin-top: 0;
+        }
+        .layer-details {
+            display: grid;
+            gap: 15px;
+        }
+        .layer-detail {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .layer-detail h4 {
+            margin: 0 0 10px 0;
+            color: #ff9f43;
+        }
+        .neuron-values {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .neuron-value {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 0.9em;
+            min-width: 40px;
+            text-align: center;
+        }
+        .explanation {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+        .explanation h3 {
+            color: #4ecdc4;
+            margin-top: 0;
+        }
+        .step-by-step {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .step {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 4px solid #4ecdc4;
+        }
+        .step h4 {
+            color: #ff9f43;
+            margin-top: 0;
+        }
+        .demo-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .demo-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .formula-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 15px 0;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Neural Network Explanation</h1>
+        <p style="text-align: center; font-size: 1.2em; margin-bottom: 30px;">
+            5 Inputs → Hidden Layer 1 (4 neurons) → Hidden Layer 2 (3 neurons) → 2 Outputs
+        </p>
+
+        <div class="demo-buttons">
+            <button class="demo-btn" onclick="setDemoInputs('classification')">Classification Example</button>
+            <button class="demo-btn" onclick="setDemoInputs('regression')">Regression Example</button>
+            <button class="demo-btn" onclick="setDemoInputs('random')">Random Values</button>
+            <button class="demo-btn" onclick="setDemoInputs('zero')">Reset to Zero</button>
+        </div>
+
+        <div class="network-container">
+            <svg class="network-svg" width="800" height="400" id="networkSvg">
+                <!-- Network will be drawn here -->
+            </svg>
+        </div>
+
+        <div class="controls">
+            <div class="input-controls">
+                <h3 style="color: #4ecdc4; margin-top: 0;">Input Values</h3>
+                <div class="input-group">
+                    <label>Input 1:</label>
+                    <input type="range" class="input-slider" id="input1" min="0" max="1" step="0.01" value="0.5">
+                    <span class="input-value" id="value1">0.50</span>
+                </div>
+                <div class="input-group">
+                    <label>Input 2:</label>
+                    <input type="range" class="input-slider" id="input2" min="0" max="1" step="0.01" value="0.3">
+                    <span class="input-value" id="value2">0.30</span>
+                </div>
+                <div class="input-group">
+                    <label>Input 3:</label>
+                    <input type="range" class="input-slider" id="input3" min="0" max="1" step="0.01" value="0.7">
+                    <span class="input-value" id="value3">0.70</span>
+                </div>
+                <div class="input-group">
+                    <label>Input 4:</label>
+                    <input type="range" class="input-slider" id="input4" min="0" max="1" step="0.01" value="0.2">
+                    <span class="input-value" id="value4">0.20</span>
+                </div>
+                <div class="input-group">
+                    <label>Input 5:</label>
+                    <input type="range" class="input-slider" id="input5" min="0" max="1" step="0.01" value="0.8">
+                    <span class="input-value" id="value5">0.80</span>
+                </div>
+            </div>
+
+            <div class="layer-info">
+                <h3>Layer Activations</h3>
+                <div class="layer-details">
+                    <div class="layer-detail">
+                        <h4>Hidden Layer 1 (4 neurons)</h4>
+                        <div class="neuron-values" id="hidden1Values"></div>
+                    </div>
+                    <div class="layer-detail">
+                        <h4>Hidden Layer 2 (3 neurons)</h4>
+                        <div class="neuron-values" id="hidden2Values"></div>
+                    </div>
+                    <div class="layer-detail">
+                        <h4>Output Layer (2 neurons)</h4>
+                        <div class="neuron-values" id="outputValues"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="formula-box">
+            Neuron Output = σ(Σ(weight × input) + bias) where σ(x) = 1/(1 + e^(-x))
+        </div>
+
+        <div class="explanation">
+            <h3>How Neural Networks Work</h3>
+            <p>This visualization shows a feedforward neural network with 5 inputs, 2 hidden layers, and 2 outputs. Each connection has a weight, and each neuron has a bias. Watch how changing inputs affects the entire network!</p>
+            
+            <div class="step-by-step">
+                <div class="step">
+                    <h4>1. Input Layer</h4>
+                    <p>The 5 input values represent features of your data (like height, weight, age, etc.). These are fed into the first hidden layer.</p>
+                </div>
+                <div class="step">
+                    <h4>2. Hidden Layer 1</h4>
+                    <p>Each of the 4 neurons receives weighted inputs from all 5 input nodes. It calculates: weight₁×input₁ + weight₂×input₂ + ... + bias</p>
+                </div>
+                <div class="step">
+                    <h4>3. Activation Function</h4>
+                    <p>The sigmoid function σ(x) = 1/(1+e^(-x)) converts the weighted sum into a value between 0 and 1, introducing non-linearity.</p>
+                </div>
+                <div class="step">
+                    <h4>4. Hidden Layer 2</h4>
+                    <p>The 3 neurons in this layer receive outputs from Hidden Layer 1 as inputs, applying their own weights and biases.</p>
+                </div>
+                <div class="step">
+                    <h4>5. Output Layer</h4>
+                    <p>The final 2 neurons produce the network's predictions. These could represent probabilities, classifications, or continuous values.</p>
+                </div>
+                <div class="step">
+                    <h4>6. Learning Process</h4>
+                    <p>During training, the network adjusts weights and biases to minimize the difference between predicted and actual outputs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Network architecture
+        const networkStructure = {
+            inputs: 5,
+            hidden1: 4,
+            hidden2: 3,
+            outputs: 2
+        };
+
+        // Random weights and biases (normally these would be learned)
+        let weights = {
+            input_hidden1: Array(5).fill().map(() => Array(4).fill().map(() => Math.random() * 2 - 1)),
+            hidden1_hidden2: Array(4).fill().map(() => Array(3).fill().map(() => Math.random() * 2 - 1)),
+            hidden2_output: Array(3).fill().map(() => Array(2).fill().map(() => Math.random() * 2 - 1))
+        };
+
+        let biases = {
+            hidden1: Array(4).fill().map(() => Math.random() * 0.5 - 0.25),
+            hidden2: Array(3).fill().map(() => Math.random() * 0.5 - 0.25),
+            output: Array(2).fill().map(() => Math.random() * 0.5 - 0.25)
+        };
+
+        // Sigmoid activation function
+        function sigmoid(x) {
+            return 1 / (1 + Math.exp(-x));
+        }
+
+        // Forward propagation
+        function forwardPropagate(inputs) {
+            // Hidden Layer 1
+            const hidden1 = [];
+            for (let i = 0; i < networkStructure.hidden1; i++) {
+                let sum = biases.hidden1[i];
+                for (let j = 0; j < networkStructure.inputs; j++) {
+                    sum += inputs[j] * weights.input_hidden1[j][i];
+                }
+                hidden1[i] = sigmoid(sum);
+            }
+
+            // Hidden Layer 2
+            const hidden2 = [];
+            for (let i = 0; i < networkStructure.hidden2; i++) {
+                let sum = biases.hidden2[i];
+                for (let j = 0; j < networkStructure.hidden1; j++) {
+                    sum += hidden1[j] * weights.hidden1_hidden2[j][i];
+                }
+                hidden2[i] = sigmoid(sum);
+            }
+
+            // Output Layer
+            const outputs = [];
+            for (let i = 0; i < networkStructure.outputs; i++) {
+                let sum = biases.output[i];
+                for (let j = 0; j < networkStructure.hidden2; j++) {
+                    sum += hidden2[j] * weights.hidden2_output[j][i];
+                }
+                outputs[i] = sigmoid(sum);
+            }
+
+            return { hidden1, hidden2, outputs };
+        }
+
+        // Draw the network
+        function drawNetwork() {
+            const svg = document.getElementById('networkSvg');
+            svg.innerHTML = '';
+
+            const layers = [
+                { count: networkStructure.inputs, x: 100, label: 'Input' },
+                { count: networkStructure.hidden1, x: 250, label: 'Hidden 1' },
+                { count: networkStructure.hidden2, x: 400, label: 'Hidden 2' },
+                { count: networkStructure.outputs, x: 550, label: 'Output' }
+            ];
+
+            const layerHeight = 300;
+            const inputs = getCurrentInputs();
+            const results = forwardPropagate(inputs);
+            const activations = [inputs, results.hidden1, results.hidden2, results.outputs];
+
+            // Draw connections
+            for (let layerIdx = 0; layerIdx < layers.length - 1; layerIdx++) {
+                const currentLayer = layers[layerIdx];
+                const nextLayer = layers[layerIdx + 1];
+
+                for (let i = 0; i < currentLayer.count; i++) {
+                    const y1 = 50 + (layerHeight / (currentLayer.count + 1)) * (i + 1);
+                    
+                    for (let j = 0; j < nextLayer.count; j++) {
+                        const y2 = 50 + (layerHeight / (nextLayer.count + 1)) * (j + 1);
+                        
+                        // Connection opacity based on activation strength
+                        const activation = activations[layerIdx][i] || 0;
+                        const opacity = 0.1 + (activation * 0.6);
+                        
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', currentLayer.x + 15);
+                        line.setAttribute('y1', y1);
+                        line.setAttribute('x2', nextLayer.x - 15);
+                        line.setAttribute('y2', y2);
+                        line.setAttribute('stroke', `rgba(100, 100, 100, ${opacity})`);
+                        line.setAttribute('stroke-width', '1');
+                        svg.appendChild(line);
+                    }
+                }
+            }
+
+            // Draw nodes
+            for (let layerIdx = 0; layerIdx < layers.length; layerIdx++) {
+                const layer = layers[layerIdx];
+                
+                // Layer label
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('x', layer.x);
+                label.setAttribute('y', 30);
+                label.setAttribute('text-anchor', 'middle');
+                label.setAttribute('fill', '#333');
+                label.setAttribute('font-weight', 'bold');
+                label.textContent = layer.label;
+                svg.appendChild(label);
+
+                for (let i = 0; i < layer.count; i++) {
+                    const y = 50 + (layerHeight / (layer.count + 1)) * (i + 1);
+                    const activation = activations[layerIdx][i] || 0;
+                    
+                    // Neuron circle
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', layer.x);
+                    circle.setAttribute('cy', y);
+                    circle.setAttribute('r', '15');
+                    
+                    // Color based on activation
+                    const intensity = Math.floor(activation * 255);
+                    const color = `rgb(${255-intensity}, ${255-intensity}, 255)`;
+                    circle.setAttribute('fill', color);
+                    circle.setAttribute('stroke', '#333');
+                    circle.setAttribute('stroke-width', '2');
+                    svg.appendChild(circle);
+
+                    // Activation value
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', layer.x);
+                    text.setAttribute('y', y + 5);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('fill', '#333');
+                    text.setAttribute('font-size', '10');
+                    text.setAttribute('font-weight', 'bold');
+                    text.textContent = activation.toFixed(2);
+                    svg.appendChild(text);
+                }
+            }
+        }
+
+        // Get current input values
+        function getCurrentInputs() {
+            return [
+                parseFloat(document.getElementById('input1').value),
+                parseFloat(document.getElementById('input2').value),
+                parseFloat(document.getElementById('input3').value),
+                parseFloat(document.getElementById('input4').value),
+                parseFloat(document.getElementById('input5').value)
+            ];
+        }
+
+        // Update display
+        function updateNetwork() {
+            const inputs = getCurrentInputs();
+            const results = forwardPropagate(inputs);
+
+            // Update input value displays
+            for (let i = 1; i <= 5; i++) {
+                const value = document.getElementById(`input${i}`).value;
+                document.getElementById(`value${i}`).textContent = parseFloat(value).toFixed(2);
+            }
+
+            // Update layer activations
+            const hidden1Html = results.hidden1.map((val, i) => 
+                `<div class="neuron-value">N${i+1}: ${val.toFixed(3)}</div>`
+            ).join('');
+            document.getElementById('hidden1Values').innerHTML = hidden1Html;
+
+            const hidden2Html = results.hidden2.map((val, i) => 
+                `<div class="neuron-value">N${i+1}: ${val.toFixed(3)}</div>`
+            ).join('');
+            document.getElementById('hidden2Values').innerHTML = hidden2Html;
+
+            const outputHtml = results.outputs.map((val, i) => 
+                `<div class="neuron-value">O${i+1}: ${val.toFixed(3)}</div>`
+            ).join('');
+            document.getElementById('outputValues').innerHTML = outputHtml;
+
+            drawNetwork();
+        }
+
+        // Demo input patterns
+        function setDemoInputs(type) {
+            const inputs = document.querySelectorAll('.input-slider');
+            
+            switch(type) {
+                case 'classification':
+                    const classVals = [0.8, 0.2, 0.9, 0.1, 0.7];
+                    inputs.forEach((input, i) => input.value = classVals[i]);
+                    break;
+                case 'regression':
+                    const regVals = [0.3, 0.6, 0.4, 0.8, 0.5];
+                    inputs.forEach((input, i) => input.value = regVals[i]);
+                    break;
+                case 'random':
+                    inputs.forEach(input => input.value = Math.random().toFixed(2));
+                    break;
+                case 'zero':
+                    inputs.forEach(input => input.value = 0);
+                    break;
+            }
+            updateNetwork();
+        }
+
+        // Add event listeners
+        document.querySelectorAll('.input-slider').forEach(slider => {
+            slider.addEventListener('input', updateNetwork);
+        });
+
+        // Initialize
+        updateNetwork();
+    </script>
+</body>
+</html>

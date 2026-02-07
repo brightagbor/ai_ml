@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNN-LSTM-Attention IDS Architecture</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            padding: 40px;
+            overflow: hidden;
+        }
+        
+        .title {
+            text-align: center;
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 40px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .architecture {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+        
+        .preprocessing-pipeline {
+            flex: 0 0 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .model-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        
+        .classification-section {
+            flex: 0 0 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .box {
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .box:hover::before {
+            left: 100%;
+        }
+        
+        .box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 35px rgba(0,0,0,0.2);
+        }
+        
+        .dataset {
+            background: linear-gradient(135deg, #a8e6cf, #88d8a3);
+            color: #2d5a41;
+        }
+        
+        .preprocessing {
+            background: linear-gradient(135deg, #dcd0ff, #b8a9ff);
+            color: #4a3d7a;
+            font-size: 0.9em;
+        }
+        
+        .encoding {
+            background: linear-gradient(135deg, #ffd3a5, #fd9853);
+            color: #8b4513;
+        }
+        
+        .splitting {
+            background: linear-gradient(135deg, #ffa0ac, #ff6b8a);
+            color: #8b1538;
+            font-size: 0.85em;
+        }
+        
+        .sampling {
+            background: linear-gradient(135deg, #a8edea, #fed6e3);
+            color: #2d5a87;
+        }
+        
+        .model-box {
+            background: linear-gradient(135deg, #d0d0d0, #a0a0a0);
+            color: #333;
+        }
+        
+        .attack-detection {
+            background: linear-gradient(135deg, #ffb3ba, #ff7b8a);
+            color: #8b1538;
+        }
+        
+        .model-detail {
+            background: white;
+            border: 3px dashed #666;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 400px;
+        }
+        
+        .model-layers {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .layer {
+            width: 350px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .layer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        
+        .layer:hover::before {
+            left: 100%;
+        }
+        
+        .layer:hover {
+            transform: scale(1.02);
+        }
+        
+        .input-layer {
+            background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+            color: #2e7d32;
+        }
+        
+        .cnn-layer {
+            background: linear-gradient(135deg, #e3f2fd, #90caf9);
+            color: #1565c0;
+        }
+        
+        .pooling-layer {
+            background: linear-gradient(135deg, #f3e5f5, #ce93d8);
+            color: #7b1fa2;
+        }
+        
+        .lstm-layer {
+            background: linear-gradient(135deg, #fff3e0, #ffb74d);
+            color: #e65100;
+        }
+        
+        .attention-layer {
+            background: linear-gradient(135deg, #fce4ec, #f06292);
+            color: #ad1457;
+        }
+        
+        .dense-layer {
+            background: linear-gradient(135deg, #e8f5e8, #a5d6a7);
+            color: #2e7d32;
+        }
+        
+        .output-layer {
+            background: linear-gradient(135deg, #fff8e1, #ffcc02);
+            color: #f57c00;
+        }
+        
+        .dropout-info {
+            background: linear-gradient(135deg, #f8bbd9, #e91e63);
+            color: white;
+        }
+        
+        .arrow {
+            font-size: 2em;
+            color: #666;
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .dimensions {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        .params {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 5px;
+            font-weight: normal;
+        }
+        
+        .section-title {
+            position: absolute;
+            top: -15px;
+            right: 20px;
+            background: white;
+            padding: 5px 15px;
+            font-weight: bold;
+            color: #333;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .hyperparams {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 0.85em;
+            color: #495057;
+            border-left: 4px solid #007bff;
+        }
+        
+        .hyperparams h4 {
+            margin: 0 0 10px 0;
+            color: #007bff;
+        }
+        
+        .param-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">CNN-LSTM-Attention IDS</h1>
+        
+        <div class="architecture">
+            <!-- Preprocessing Pipeline -->
+            <div class="preprocessing-pipeline">
+                <div class="box dataset">
+                    5G-NIDD<br>Dataset
+                </div>
+                
+                <div class="arrow">↓</div>
+                
+                <div class="box preprocessing">
+                    Feature Selection<br>and Cleaning
+                </div>
+                
+                <div class="arrow">↓</div>
+                
+                <div class="box encoding">
+                    Feature Encoding
+                </div>
+                
+                <div class="arrow">↓</div>
+                
+                <div class="box splitting">
+                    Data Splitting<br>
+                    <span style="font-size: 0.8em;">(Train: 80% & Test: 20%)</span>
+                </div>
+                
+                <div class="arrow">↓</div>
+                
+                <div class="box sampling">
+                    Sampling<br>(SMOTE)
+                </div>
+                
+                <div class="arrow">↓</div>
+                
+                <div class="box model-box">
+                    CNN-LSTM<br>Model
+                </div>
+                
+                <div class="arrow">↓</div>
+                
+                <div class="box attack-detection">
+                    Attack<br>Detection
+                </div>
+            </div>
+            
+            <!-- Model Detail Section -->
+            <div class="model-section">
+                <div class="model-detail">
+                    <div class="section-title">CNN-LSTM-Attention Model</div>
+                    
+                    <div class="model-layers">
+                        <div class="layer input-layer">
+                            Input Layer
+                            <div class="params">shape=input_shape</div>
+                            <div class="dimensions">↓ Reshape if needed</div>
+                        </div>
+                        
+                        <div class="layer cnn-layer">
+                            Conv1D Layer 1
+                            <div class="params">filters=64, kernel=3, activation='relu'</div>
+                            <div class="dimensions">+ BatchNorm + L2 Regularization</div>
+                        </div>
+                        
+                        <div class="layer pooling-layer">
+                            MaxPooling1D
+                            <div class="params">pool_size=2</div>
+                        </div>
+                        
+                        <div class="layer cnn-layer">
+                            Conv1D Layer 2
+                            <div class="params">filters=32, kernel=3, activation='relu'</div>
+                            <div class="dimensions">+ BatchNorm + L2 Regularization</div>
+                        </div>
+                        
+                        <div class="layer pooling-layer">
+                            MaxPooling1D
+                            <div class="params">pool_size=2</div>
+                        </div>
+                        
+                        <div class="layer lstm-layer">
+                            LSTM Layer 1
+                            <div class="params">units=128, return_sequences=True</div>
+                            <div class="dimensions">dropout=0.3, recurrent_dropout=0.3</div>
+                        </div>
+                        
+                        <div class="layer lstm-layer">
+                            LSTM Layer 2
+                            <div class="params">units=64, return_sequences=True</div>
+                            <div class="dimensions">+ BatchNorm + L2 Regularization</div>
+                        </div>
+                        
+                        <div class="layer lstm-layer">
+                            LSTM Layer 3
+                            <div class="params">units=32, return_sequences=True</div>
+                            <div class="dimensions">+ BatchNorm + L2 Regularization</div>
+                        </div>
+                        
+                        <div class="layer attention-layer">
+                            Attention Mechanism
+                            <div class="params">Dense(1) → Softmax → Multiply → Sum</div>
+                            <div class="dimensions">Context Vector Generation</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hyperparams">
+                    <h4>Key Hyperparameters</h4>
+                    <div class="param-grid">
+                        <div>Learning Rate: 0.0005</div>
+                        <div>L2 Lambda: 0.01</div>
+                        <div>Dropout Rate: 0.3</div>
+                        <div>Batch Size: variable</div>
+                        <div>Optimizer: Adam</div>
+                        <div>Loss: Binary Crossentropy</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Classification Section -->
+            <div class="classification-section">
+                <div class="layer dense-layer">
+                    Dense Layer 1
+                    <div class="params">units=64, activation='relu'</div>
+                    <div class="dimensions">+ L2 Regularization</div>
+                </div>
+                
+                <div class="layer dropout-info">
+                    Dropout Layer
+                    <div class="params">rate=0.3</div>
+                </div>
+                
+                <div class="layer dense-layer" style="background: linear-gradient(135deg, #e1f5fe, #81d4fa);">
+                    BatchNormalization
+                    <div class="params">Normalize activations</div>
+                </div>
+                
+                <div class="layer dense-layer">
+                    Dense Layer 2
+                    <div class="params">units=32, activation='relu'</div>
+                    <div class="dimensions">+ L2 Regularization</div>
+                </div>
+                
+                <div class="layer dropout-info">
+                    Dropout Layer
+                    <div class="params">rate=0.3</div>
+                </div>
+                
+                <div class="layer output-layer">
+                    Output Layer
+                    <div class="params">units=1, activation='sigmoid'</div>
+                    <div class="dimensions">Binary Classification</div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; font-size: 0.85em;">
+                    <strong>Training Configuration:</strong><br>
+                    • Early Stopping (patience=15)<br>
+                    • ReduceLROnPlateau (patience=7)<br>
+                    • Monitor: val_loss<br>
+                    • Metrics: Accuracy
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px; font-weight: bold; color: #666;">
+            Fig. 8. Architecture of CNN-LSTM-Attention model to perform binary classification on 5G-NIDD.
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RNN vs LSTM Visual Explainer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .input-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        input[type="text"] {
+            padding: 12px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 25px;
+            flex: 1;
+            min-width: 250px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+        }
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        .visualizations {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .viz-container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            min-height: 500px;
+        }
+        .viz-container h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        .network-canvas {
+            width: 100%;
+            min-height: 400px;
+            position: relative;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        .node {
+            transition: all 0.3s ease;
+        }
+        .node:hover {
+            transform: scale(1.1);
+        }
+        .connection {
+            stroke-width: 2;
+            opacity: 0.6;
+            transition: all 0.3s ease;
+        }
+        .connection:hover {
+            stroke-width: 3;
+            opacity: 1;
+        }
+        .info-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .info-box {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #f5576c;
+        }
+        .info-box h3 {
+            margin-bottom: 10px;
+            color: #f5576c;
+        }
+        .info-box p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .node-label {
+            font-size: 14px;
+            font-weight: bold;
+            fill: white;
+            text-anchor: middle;
+        }
+        .gate-label {
+            font-size: 11px;
+            fill: white;
+            text-anchor: middle;
+        }
+        @media (max-width: 1024px) {
+            .visualizations {
+                grid-template-columns: 1fr;
+            }
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 RNN vs LSTM Visual Explainer</h1>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <input type="text" id="sequenceInput" placeholder="Enter a short sequence (e.g., Hello World, 1 2 3 4 5)" value="Hello">
+                <button onclick="processSequence()">Process Sequence</button>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4CAF50;"></div>
+                    <span>Input</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2196F3;"></div>
+                    <span>Hidden State</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF9800;"></div>
+                    <span>Output</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #E91E63;"></div>
+                    <span>Gates (LSTM)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00BCD4;"></div>
+                    <span>Cell State (LSTM)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="visualizations">
+            <div class="viz-container">
+                <h2>🔄 Basic RNN</h2>
+                <div class="network-canvas">
+                    <svg id="rnnSvg" viewBox="0 0 800 500"></svg>
+                </div>
+            </div>
+            <div class="viz-container">
+                <h2>🎯 LSTM Network</h2>
+                <div class="network-canvas">
+                    <svg id="lstmSvg" viewBox="0 0 800 600"></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h2 style="text-align: center; margin-bottom: 20px;">Key Differences</h2>
+            <div class="info-grid">
+                <div class="info-box">
+                    <h3>Basic RNN</h3>
+                    <p>• Simple architecture with direct hidden state updates</p>
+                    <p>• Information flows: Input → Hidden State → Output</p>
+                    <p>• Hidden states connect sequentially across time</p>
+                    <p>• Struggles with long-term dependencies</p>
+                    <p>• Prone to vanishing/exploding gradients</p>
+                </div>
+                <div class="info-box">
+                    <h3>LSTM Network</h3>
+                    <p>• Complex gating mechanisms control information flow</p>
+                    <p>• Forget gate: decides what to remove from memory</p>
+                    <p>• Input gate: decides what new information to store</p>
+                    <p>• Output gate: decides what to output from memory</p>
+                    <p>• Cell state acts as a "memory highway" across time</p>
+                    <p>• Excels at capturing long-term dependencies</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function createRNNVisualization(sequence) {
+            const svg = document.getElementById('rnnSvg');
+            svg.innerHTML = '';
+            
+            const width = 800;
+            const height = 500;
+            const spacing = Math.min(150, width / (sequence.length + 1));
+            const startX = (width - (sequence.length - 1) * spacing) / 2;
+            
+            // Create connections first (so they appear behind nodes)
+            for (let i = 0; i < sequence.length; i++) {
+                const x = startX + i * spacing;
+                
+                // Input to Hidden
+                createLine(svg, x, 100, x, 200, '#4CAF50');
+                
+                // Hidden to Output
+                createLine(svg, x, 280, x, 380, '#FF9800');
+                
+                // Hidden to next Hidden (recurrent connection)
+                if (i < sequence.length - 1) {
+                    const nextX = x + spacing;
+                    createArrow(svg, x + 30, 240, nextX - 30, 240, '#2196F3');
+                }
+            }
+            
+            // Create nodes
+            for (let i = 0; i < sequence.length; i++) {
+                const x = startX + i * spacing;
+                
+                // Input node
+                createCircle(svg, x, 100, 25, '#4CAF50', 'node');
+                createText(svg, x, 105, sequence[i], 'node-label');
+                
+                // Hidden state
+                createRect(svg, x - 30, 200, 60, 80, '#2196F3', 'node');
+                createText(svg, x, 245, 'h' + i, 'node-label');
+                
+                // Output node
+                createCircle(svg, x, 380, 25, '#FF9800', 'node');
+                createText(svg, x, 385, 'y' + i, 'node-label');
+                
+                // Time step label
+                createText(svg, x, 450, 't=' + i, 'gate-label');
+            }
+        }
+
+        function createLSTMVisualization(sequence) {
+            const svg = document.getElementById('lstmSvg');
+            svg.innerHTML = '';
+            
+            const width = 800;
+            const height = 600;
+            const spacing = Math.min(200, width / (sequence.length + 1));
+            const startX = (width - (sequence.length - 1) * spacing) / 2;
+            
+            // Create connections first
+            for (let i = 0; i < sequence.length; i++) {
+                const x = startX + i * spacing;
+                
+                // Input to gates
+                createLine(svg, x, 100, x - 40, 200, '#4CAF50');
+                createLine(svg, x, 100, x, 200, '#4CAF50');
+                createLine(svg, x, 100, x + 40, 200, '#4CAF50');
+                
+                // Gates to cell state
+                createLine(svg, x - 40, 240, x, 300, '#E91E63');
+                createLine(svg, x, 240, x, 300, '#E91E63');
+                
+                // Cell state to hidden
+                createLine(svg, x, 340, x, 420, '#00BCD4');
+                createLine(svg, x + 40, 240, x, 420, '#E91E63');
+                
+                // Hidden to output
+                createLine(svg, x, 470, x, 530, '#FF9800');
+                
+                // Cell state highway (horizontal connection)
+                if (i < sequence.length - 1) {
+                    const nextX = x + spacing;
+                    createArrow(svg, x + 30, 320, nextX - 30, 320, '#00BCD4', 3);
+                }
+                
+                // Hidden state to next time step
+                if (i < sequence.length - 1) {
+                    const nextX = x + spacing;
+                    createArrow(svg, x + 25, 445, nextX - 50, 200, '#2196F3', 2);
+                }
+            }
+            
+            // Create nodes
+            for (let i = 0; i < sequence.length; i++) {
+                const x = startX + i * spacing;
+                
+                // Input node
+                createCircle(svg, x, 100, 25, '#4CAF50', 'node');
+                createText(svg, x, 105, sequence[i], 'node-label');
+                
+                // Gates
+                createCircle(svg, x - 40, 220, 20, '#E91E63', 'node');
+                createText(svg, x - 40, 225, 'f', 'node-label');
+                createText(svg, x - 40, 260, 'forget', 'gate-label');
+                
+                createCircle(svg, x, 220, 20, '#E91E63', 'node');
+                createText(svg, x, 225, 'i', 'node-label');
+                createText(svg, x, 260, 'input', 'gate-label');
+                
+                createCircle(svg, x + 40, 220, 20, '#E91E63', 'node');
+                createText(svg, x + 40, 225, 'o', 'node-label');
+                createText(svg, x + 40, 260, 'output', 'gate-label');
+                
+                // Cell state
+                createRect(svg, x - 30, 300, 60, 40, '#00BCD4', 'node');
+                createText(svg, x, 325, 'C' + i, 'node-label');
+                
+                // Hidden state
+                createRect(svg, x - 30, 420, 60, 50, '#2196F3', 'node');
+                createText(svg, x, 450, 'h' + i, 'node-label');
+                
+                // Output node
+                createCircle(svg, x, 530, 25, '#FF9800', 'node');
+                createText(svg, x, 535, 'y' + i, 'node-label');
+                
+                // Time step label
+                createText(svg, x, 570, 't=' + i, 'gate-label');
+            }
+        }
+
+        function createCircle(svg, cx, cy, r, fill, className) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', cx);
+            circle.setAttribute('cy', cy);
+            circle.setAttribute('r', r);
+            circle.setAttribute('fill', fill);
+            circle.setAttribute('class', className);
+            circle.setAttribute('stroke', 'white');
+            circle.setAttribute('stroke-width', '2');
+            svg.appendChild(circle);
+            return circle;
+        }
+
+        function createRect(svg, x, y, width, height, fill, className) {
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', x);
+            rect.setAttribute('y', y);
+            rect.setAttribute('width', width);
+            rect.setAttribute('height', height);
+            rect.setAttribute('fill', fill);
+            rect.setAttribute('class', className);
+            rect.setAttribute('stroke', 'white');
+            rect.setAttribute('stroke-width', '2');
+            rect.setAttribute('rx', '5');
+            svg.appendChild(rect);
+            return rect;
+        }
+
+        function createLine(svg, x1, y1, x2, y2, stroke) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', stroke);
+            line.setAttribute('class', 'connection');
+            svg.appendChild(line);
+            return line;
+        }
+
+        function createArrow(svg, x1, y1, x2, y2, stroke, strokeWidth = 2) {
+            // Line
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', stroke);
+            line.setAttribute('stroke-width', strokeWidth);
+            line.setAttribute('class', 'connection');
+            svg.appendChild(line);
+            
+            // Arrow head
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const arrowLength = 10;
+            const arrowAngle = Math.PI / 6;
+            
+            const arrow1X = x2 - arrowLength * Math.cos(angle - arrowAngle);
+            const arrow1Y = y2 - arrowLength * Math.sin(angle - arrowAngle);
+            const arrow2X = x2 - arrowLength * Math.cos(angle + arrowAngle);
+            const arrow2Y = y2 - arrowLength * Math.sin(angle + arrowAngle);
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${x2} ${y2} L ${arrow1X} ${arrow1Y} M ${x2} ${y2} L ${arrow2X} ${arrow2Y}`);
+            path.setAttribute('stroke', stroke);
+            path.setAttribute('stroke-width', strokeWidth);
+            path.setAttribute('fill', 'none');
+            svg.appendChild(path);
+        }
+
+        function createText(svg, x, y, text, className) {
+            const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            textEl.setAttribute('x', x);
+            textEl.setAttribute('y', y);
+            textEl.setAttribute('class', className);
+            textEl.textContent = text;
+            svg.appendChild(textEl);
+            return textEl;
+        }
+
+        function processSequence() {
+            const input = document.getElementById('sequenceInput').value.trim();
+            if (!input) {
+                alert('Please enter a sequence!');
+                return;
+            }
+
+            const sequence = input.split(/\s+/).slice(0, 5); // Limit to 5 elements for clarity
+            
+            createRNNVisualization(sequence);
+            createLSTMVisualization(sequence);
+        }
+
+        // Initialize with default sequence
+        processSequence();
+    </script>
+</body>
+</html>

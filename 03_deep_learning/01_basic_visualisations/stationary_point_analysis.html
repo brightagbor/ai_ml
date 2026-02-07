@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Error Surface - Stationary Points</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f0f8ff, #e6f3ff);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            color: #333;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(0, 150, 255, 0.2);
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            color: #333;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(0, 150, 255, 0.2);
+            max-width: 350px;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            margin: 3px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            text-align: center;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+            background: linear-gradient(45deg, #45a049, #3d8b40);
+        }
+        
+        button.active {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+        }
+        
+        button.active:hover {
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+        }
+        
+        label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0 10px 0;
+        }
+        
+        .point-info {
+            font-size: 13px;
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(240, 248, 255, 0.8);
+            border-radius: 8px;
+            border-left: 4px solid #0066ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="controls">
+            <h3>🎛️ Controls</h3>
+            <button onclick="toggleAnimation()">⏯️ Toggle Animation</button>
+            <button onclick="resetView()">🔄 Reset View</button>
+            <button onclick="showGradient()">📐 Show Gradients</button>
+            <button onclick="toggleStationaryPoints()">🎯 Show Stationary Points</button>
+            <button onclick="toggleHighlightMinima()">🔍 Highlight Minima Types</button>
+            
+            <label>Surface Complexity:</label>
+            <input type="range" min="0.5" max="3" step="0.1" value="1.5" onchange="updateSurface(this.value)">
+            
+            <label>Animation Speed:</label>
+            <input type="range" min="0.1" max="2" step="0.1" value="1" onchange="setAnimationSpeed(this.value)">
+        </div>
+        
+        <div id="info">
+            <h3>📊 Stationary Points Analysis</h3>
+            <div class="point-info">
+                <strong>🔵 Global Minimum:</strong><br>
+                Lowest point on entire surface - ∇E(w) = 0
+            </div>
+            <div class="point-info">
+                <strong>🔴 Local Minimum:</strong><br>
+                Valley point in local region - ∇E(w) = 0
+            </div>
+            <div class="point-info">
+                <strong>🟠 Local Maximum:</strong><br>
+                Peak point in local region - ∇E(w) = 0
+            </div>
+            <div class="point-info">
+                <strong>🟡 Saddle Point:</strong><br>
+                Min in one direction, max in another - ∇E(w) = 0
+            </div>
+            <div class="point-info">
+                <strong>🟢 Current Point:</strong><br>
+                Shows gradient direction ∇E(w) ≠ 0
+            </div>
+            <p><strong>💡 Key Insight:</strong> All stationary points have zero gradient, but only global minimum gives optimal solution!</p>
+            
+            <div id="stats" style="margin-top: 10px; font-size: 12px; background: rgba(240, 248, 255, 0.8); padding: 8px; border-radius: 5px;">
+                <div>Current Error: <span id="currentError">0.00</span></div>
+                <div>Gradient Magnitude: <span id="gradientMag">0.00</span></div>
+                <div>Point Type: <span id="pointType">Regular</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, errorSurface;
+        let globalMin, localMin, currentPoint;
+        let gradientArrows = [];
+        let animationId;
+        let isAnimating = true;
+        let animationSpeed = 1;
+        let surfaceComplexity = 1.5;
+        let showGradients = false;
+        
+        // Stationary Points
+        let stationaryPoints = [];
+        let showStationaryPoints = false;
+        let localMaximum, saddlePoint;
+        let highlightMinima = false;
+        
+        // Initialize the scene
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf5f5f5);
+            
+            // Add a subtle gradient background
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 512;
+            const gradient = context.createLinearGradient(0, 0, 0, 512);
+            gradient.addColorStop(0, '#e3f2fd');
+            gradient.addColorStop(1, '#bbdefb');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 512, 512);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            scene.background = texture;
+            
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 15, 15);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            // Add additional fill light
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            fillLight.position.set(-10, 10, -10);
+            scene.add(fillLight);
+            
+            // Create error surface
+            createErrorSurface();
+            
+            // Create special points
+            createSpecialPoints();
+            
+            // Create all stationary points
+            createAllStationaryPoints();
+            
+            // Create axes
+            createAxes();
+            
+            // Mouse controls
+            setupMouseControls();
+            
+            // Start animation
+            animate();
+        }
+        
+        // Create the error surface using a parametric function
+        function createErrorSurface() {
+            const geometry = new THREE.ParametricGeometry((u, v, target) => {
+                const x = (u - 0.5) * 20; // w1 axis
+                const z = (v - 0.5) * 20; // w2 axis
+                
+                // Create a complex error surface with multiple minima, maxima, and saddle points
+                let y = 2 + 
+                    Math.sin(x * 0.3 * surfaceComplexity) * Math.cos(z * 0.3 * surfaceComplexity) * 3 +
+                    Math.exp(-((x - 5) ** 2 + (z - 3) ** 2) / 20) * 8 + // Local minimum
+                    Math.exp(-((x + 3) ** 2 + (z + 5) ** 2) / 15) * 12 + // Another local min
+                    Math.exp(-((x + 3) ** 2 + (z + 5) ** 2) / 25) * -15 + // Local maximum
+                    (x ** 2 + z ** 2) * 0.02 + // Global trend
+                    Math.sin(x * 0.1) * Math.sin(z * 0.1) * 2 +
+                    // Saddle point creation
+                    (x + 6) * (z - 2) * 0.05;
+                
+                // Make global minimum more pronounced
+                y -= Math.exp(-((x - 2) ** 2 + (z - 1) ** 2) / 8) * 15;
+                
+                target.set(x, y, z);
+            }, 80, 80);
+            
+            // Create gradient-based coloring
+            const colors = [];
+            const positions = geometry.attributes.position.array;
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                const y = positions[i + 1];
+                const normalizedHeight = Math.max(0, Math.min(1, (y + 5) / 20));
+                
+                // Color from blue (low) to red (high)
+                const r = normalizedHeight;
+                const g = 1 - Math.abs(normalizedHeight - 0.5) * 2;
+                const b = 1 - normalizedHeight;
+                
+                colors.push(r, g, b);
+            }
+            
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            
+            const material = new THREE.MeshPhongMaterial({ 
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide,
+                shininess: 30
+            });
+            
+            if (errorSurface) {
+                scene.remove(errorSurface);
+            }
+            
+            errorSurface = new THREE.Mesh(geometry, material);
+            errorSurface.receiveShadow = true;
+            scene.add(errorSurface);
+        }
+        
+        // Create special points (minima and current point)
+        function createSpecialPoints() {
+            // Global minimum (wB)
+            const globalMinGeom = new THREE.SphereGeometry(0.6, 16, 16);
+            const globalMinMat = new THREE.MeshPhongMaterial({ 
+                color: 0x1976d2,
+                emissive: 0x0d47a1,
+                shininess: 100
+            });
+            globalMin = new THREE.Mesh(globalMinGeom, globalMinMat);
+            globalMin.position.set(2, getErrorValue(2, 1) + 0.6, 1);
+            globalMin.castShadow = true;
+            scene.add(globalMin);
+            
+            // Local minimum (wA)
+            const localMinGeom = new THREE.SphereGeometry(0.5, 16, 16);
+            const localMinMat = new THREE.MeshPhongMaterial({ 
+                color: 0xf44336,
+                emissive: 0xd32f2f,
+                shininess: 100
+            });
+            localMin = new THREE.Mesh(localMinGeom, localMinMat);
+            localMin.position.set(5, getErrorValue(5, 3) + 0.5, 3);
+            localMin.castShadow = true;
+            scene.add(localMin);
+            
+            // Current point (wC)
+            const currentGeom = new THREE.SphereGeometry(0.4, 16, 16);
+            const currentMat = new THREE.MeshPhongMaterial({ 
+                color: 0x4caf50,
+                emissive: 0x2e7d32,
+                shininess: 100
+            });
+            currentPoint = new THREE.Mesh(currentGeom, currentMat);
+            currentPoint.castShadow = true;
+            scene.add(currentPoint);
+        }
+        
+        // Create all stationary points (minima, maxima, saddle points)
+        function createAllStationaryPoints() {
+            // Local Maximum
+            const maxGeom = new THREE.SphereGeometry(0.5, 16, 16);
+            const maxMat = new THREE.MeshPhongMaterial({ 
+                color: 0xff9800,
+                emissive: 0xf57c00,
+                shininess: 100
+            });
+            localMaximum = new THREE.Mesh(maxGeom, maxMat);
+            localMaximum.position.set(-3, getErrorValue(-3, -5) + 0.5, -5);
+            localMaximum.castShadow = true;
+            localMaximum.visible = false;
+            scene.add(localMaximum);
+            
+            // Saddle Point
+            const saddleGeom = new THREE.SphereGeometry(0.5, 16, 16);
+            const saddleMat = new THREE.MeshPhongMaterial({ 
+                color: 0xffc107,
+                emissive: 0xff8f00,
+                shininess: 100
+            });
+            saddlePoint = new THREE.Mesh(saddleGeom, saddleMat);
+            saddlePoint.position.set(-6, getErrorValue(-6, 2) + 0.5, 2);
+            saddlePoint.castShadow = true;
+            saddlePoint.visible = false;
+            scene.add(saddlePoint);
+            
+            // Store all stationary points for easy reference
+            stationaryPoints = [globalMin, localMin, localMaximum, saddlePoint];
+        }
+        
+        // Calculate error value at given coordinates
+        function getErrorValue(x, z) {
+            let y = 2 + 
+                Math.sin(x * 0.3 * surfaceComplexity) * Math.cos(z * 0.3 * surfaceComplexity) * 3 +
+                Math.exp(-((x - 5) ** 2 + (z - 3) ** 2) / 20) * 8 +
+                Math.exp(-((x + 3) ** 2 + (z + 5) ** 2) / 15) * 12 +
+                Math.exp(-((x + 3) ** 2 + (z + 5) ** 2) / 25) * -15 +
+                (x ** 2 + z ** 2) * 0.02 +
+                Math.sin(x * 0.1) * Math.sin(z * 0.1) * 2 +
+                (x + 6) * (z - 2) * 0.05;
+            
+            y -= Math.exp(-((x - 2) ** 2 + (z - 1) ** 2) / 8) * 15;
+            return y;
+        }
+        
+        // Calculate gradient at given point
+        function getGradient(x, z) {
+            const delta = 0.1;
+            const dx = (getErrorValue(x + delta, z) - getErrorValue(x - delta, z)) / (2 * delta);
+            const dz = (getErrorValue(x, z + delta) - getErrorValue(x, z - delta)) / (2 * delta);
+            return { x: dx, z: dz, magnitude: Math.sqrt(dx*dx + dz*dz) };
+        }
+        
+        // Create coordinate axes
+        function createAxes() {
+            const axesHelper = new THREE.AxesHelper(10);
+            scene.add(axesHelper);
+        }
+        
+        // Setup mouse controls
+        function setupMouseControls() {
+            let isMouseDown = false;
+            let mouseX = 0;
+            let mouseY = 0;
+            let phi = 0; // Vertical rotation
+            let theta = 0; // Horizontal rotation
+            const radius = 25; // Distance from center
+            
+            // Mouse down
+            renderer.domElement.addEventListener('mousedown', (event) => {
+                isMouseDown = true;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+                renderer.domElement.style.cursor = 'grabbing';
+            });
+            
+            // Mouse up
+            document.addEventListener('mouseup', () => {
+                isMouseDown = false;
+                renderer.domElement.style.cursor = 'grab';
+            });
+            
+            // Mouse move
+            document.addEventListener('mousemove', (event) => {
+                if (!isMouseDown) return;
+                
+                const deltaX = event.clientX - mouseX;
+                const deltaY = event.clientY - mouseY;
+                
+                // Update rotation angles
+                theta -= deltaX * 0.01;
+                phi += deltaY * 0.01;
+                
+                // Limit vertical rotation
+                phi = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, phi));
+                
+                // Update camera position
+                camera.position.x = radius * Math.sin(theta) * Math.cos(phi);
+                camera.position.y = radius * Math.sin(phi);
+                camera.position.z = radius * Math.cos(theta) * Math.cos(phi);
+                
+                camera.lookAt(0, 0, 0);
+                
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            });
+            
+            // Mouse wheel for zooming
+            renderer.domElement.addEventListener('wheel', (event) => {
+                event.preventDefault();
+                const scale = event.deltaY > 0 ? 1.1 : 0.9;
+                camera.position.multiplyScalar(scale);
+                camera.lookAt(0, 0, 0);
+            });
+            
+            // Set initial cursor style
+            renderer.domElement.style.cursor = 'grab';
+        }
+        
+        // Animation loop
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            
+            if (isAnimating) {
+                const time = Date.now() * 0.001 * animationSpeed;
+                
+                // Move current point along surface
+                const x = Math.sin(time * 0.5) * 6;
+                const z = Math.cos(time * 0.3) * 5;
+                const y = getErrorValue(x, z);
+                
+                currentPoint.position.set(x, y + 0.5, z);
+                
+                // Update stats
+                updateCurrentStats(x, z);
+                
+                // Update gradient arrows if visible
+                if (showGradients) {
+                    updateGradientArrows();
+                }
+                
+                // Pulse stationary points if visible
+                if (showStationaryPoints) {
+                    pulseStationaryPoints(time);
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Update current statistics
+        function updateCurrentStats(x, z) {
+            const error = getErrorValue(x, z);
+            const gradient = getGradient(x, z);
+            
+            document.getElementById('currentError').textContent = error.toFixed(3);
+            document.getElementById('gradientMag').textContent = gradient.magnitude.toFixed(3);
+            
+            // Determine point type based on gradient magnitude
+            let pointType = 'Regular';
+            if (gradient.magnitude < 0.1) {
+                pointType = 'Near Stationary';
+            }
+            if (gradient.magnitude < 0.01) {
+                pointType = 'Stationary Point';
+            }
+            document.getElementById('pointType').textContent = pointType;
+        }
+        
+        // Pulse animation for stationary points
+        function pulseStationaryPoints(time) {
+            stationaryPoints.forEach((point, index) => {
+                if (point && point.visible) {
+                    const scale = 1 + Math.sin(time * 3 + index) * 0.2;
+                    point.scale.set(scale, scale, scale);
+                }
+            });
+        }
+        
+        // Control functions
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+            const button = event.target;
+            button.classList.toggle('active');
+        }
+        
+        function resetView() {
+            camera.position.set(15, 15, 15);
+            camera.lookAt(0, 0, 0);
+        }
+        
+        function showGradient() {
+            showGradients = !showGradients;
+            const button = event.target;
+            button.classList.toggle('active');
+            
+            if (showGradients) {
+                createGradientArrows();
+            } else {
+                clearGradientArrows();
+            }
+        }
+        
+        function toggleStationaryPoints() {
+            showStationaryPoints = !showStationaryPoints;
+            const button = event.target;
+            button.classList.toggle('active');
+            
+            // Toggle visibility of stationary points
+            if (localMaximum) localMaximum.visible = showStationaryPoints;
+            if (saddlePoint) saddlePoint.visible = showStationaryPoints;
+        }
+        
+        function toggleHighlightMinima() {
+            highlightMinima = !highlightMinima;
+            const button = event.target;
+            button.classList.toggle('active');
+            
+            if (highlightMinima) {
+                // Make minima larger and more prominent
+                globalMin.scale.set(1.5, 1.5, 1.5);
+                localMin.scale.set(1.3, 1.3, 1.3);
+                
+                // Add glow effect
+                globalMin.material.emissiveIntensity = 0.3;
+                localMin.material.emissiveIntensity = 0.3;
+            } else {
+                // Reset to normal size
+                globalMin.scale.set(1, 1, 1);
+                localMin.scale.set(1, 1, 1);
+                
+                globalMin.material.emissiveIntensity = 0.1;
+                localMin.material.emissiveIntensity = 0.1;
+            }
+        }
+        
+        function updateSurface(complexity) {
+            surfaceComplexity = parseFloat(complexity);
+            createErrorSurface();
+            
+            // Update point positions
+            globalMin.position.set(2, getErrorValue(2, 1) + 0.6, 1);
+            localMin.position.set(5, getErrorValue(5, 3) + 0.5, 3);
+            if (localMaximum) localMaximum.position.set(-3, getErrorValue(-3, -5) + 0.5, -5);
+            if (saddlePoint) saddlePoint.position.set(-6, getErrorValue(-6, 2) + 0.5, 2);
+        }
+        
+        function setAnimationSpeed(speed) {
+            animationSpeed = parseFloat(speed);
+        }
+        
+        function createGradientArrows() {
+            clearGradientArrows();
+            
+            // Create grid of gradient arrows
+            for (let x = -8; x <= 8; x += 2) {
+                for (let z = -8; z <= 8; z += 2) {
+                    const gradient = getGradient(x, z);
+                    const y = getErrorValue(x, z);
+                    
+                    // Create arrow geometry
+                    const direction = new THREE.Vector3(-gradient.x, 0, -gradient.z).normalize();
+                    const origin = new THREE.Vector3(x, y + 1, z);
+                    const length = Math.min(2, Math.sqrt(gradient.x ** 2 + gradient.z ** 2));
+                    
+                    const arrowHelper = new THREE.ArrowHelper(
+                        direction, origin, length, 0xffff00, length * 0.2, length * 0.1
+                    );
+                    
+                    gradientArrows.push(arrowHelper);
+                    scene.add(arrowHelper);
+                }
+            }
+        }
+        
+        function updateGradientArrows() {
+            // Update gradient arrows in real-time if needed
+        }
+        
+        function clearGradientArrows() {
+            gradientArrows.forEach(arrow => scene.remove(arrow));
+            gradientArrows = [];
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Initialize everything
+        init();
+    </script>
+</body>
+</html>
