@@ -1,0 +1,1 @@
+This directory is for transfer learning and fine-tuning of pre-trained models. Leveraging the knowledge they have learnt on more complex task to train other models where data is limited or resources are limited.

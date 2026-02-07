@@ -1,4 +1,6 @@
 datasets/
+models/
+model/
 *.csv
 *.h5
 *.keras
